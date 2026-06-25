@@ -1,0 +1,18 @@
+# À ajouter dans /boot/firmware/config.txt (Bookworm) ou /boot/config.txt (Bullseye)
+# puis redémarrer.
+
+# --- UART PL011 sur GPIO14/15 (LD2450 @ 256000 baud) ---
+# Désactive le Bluetooth pour libérer ttyAMA0 (mini-UART ttyS0 instable à haut débit).
+dtoverlay=disable-bt
+
+# --- Émetteur IR sur GPIO17 ---
+dtoverlay=gpio-ir-tx,gpio_pin=17
+
+# --- (Optionnel) Récepteur IR sur GPIO18, requis SEULEMENT pour capturer ---
+# --- les codes depuis la télécommande BN59-01259B (le module Haljia émet seul). ---
+#dtoverlay=gpio-ir,gpio_pin=18
+
+# Après reboot :
+#   sudo systemctl disable hciuart   # plus de service BT sur l'UART
+#   ls /dev/ttyAMA0 /dev/lirc0
+#   ir-ctl -d /dev/lirc0 --features

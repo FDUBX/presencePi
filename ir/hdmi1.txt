@@ -1,0 +1,11 @@
+# Samsung HDMI 1 - PLACEHOLDER À VALIDER
+#
+# Ne PAS utiliser tel quel. Générer le fichier réel :
+#   python3 src/samsung_ir_gen.py 0xE0E09768 > ir/hdmi1.txt
+#
+# 0xE0E09768 = code HDMI1 Samsung largement documenté (séries MU/NU/KU).
+# Si la TV ne réagit pas :
+#   1. réessayer LSB-first : src/samsung_ir_gen.py --lsb 0xE0E09768
+#   2. capturer depuis la télécommande BN59-01259B (récepteur IR requis) :
+#        ir-ctl -d /dev/lirc1 --receive=ir/hdmi1.txt
+# Vérifier l'émission : ir-ctl -d /dev/lirc0 --send=ir/hdmi1.txt + caméra smartphone.

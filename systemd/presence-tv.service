@@ -1,0 +1,19 @@
+[Unit]
+Description=Presence TV Input Controller - Samsung UE55MU6170
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/presence_tv/presence_tv.py
+Environment=PRESENCE_TV_CONFIG=/opt/presence_tv/presence_tv.ini
+WorkingDirectory=/opt/presence_tv
+Restart=always
+RestartSec=5
+User=presence
+# Accès UART + lirc
+SupplementaryGroups=dialout video
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

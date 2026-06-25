@@ -1,0 +1,10 @@
+# Samsung HDMI 2 - PLACEHOLDER À VALIDER
+#
+# Ne PAS utiliser tel quel. Générer le fichier réel :
+#   python3 src/samsung_ir_gen.py 0xE0E0D728 > ir/hdmi2.txt
+#
+# 0xE0E0D728 = code HDMI2 candidat (À CONFIRMER - varie selon série).
+# CAVEAT connu : certains modèles Samsung renvoient "Not Available" sur le
+# code discret HDMI2+. Si échec, capturer depuis la télécommande BN59-01259B :
+#   ir-ctl -d /dev/lirc1 --receive=ir/hdmi2.txt
+# Vérifier l'émission : ir-ctl -d /dev/lirc0 --send=ir/hdmi2.txt + caméra smartphone.
