@@ -73,7 +73,11 @@ class LD2450:
 
     def read_frame(self):
         """Retourne la liste des cibles d'une trame complète, ou None."""
-        chunk = self.ser.read(self.FRAME_LEN)
+        try:
+            chunk = self.ser.read(self.FRAME_LEN)
+        except serial.SerialException:
+            # readiness race PL011 : lecture transitoire vide, resync au prochain tour
+            return None
         if chunk:
             self._buf.extend(chunk)
 
