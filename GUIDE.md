@@ -79,6 +79,18 @@ sudo raspi-config
 #   Serial port hardware    : YES
 ```
 
+> ⚠️ Sur certaines images, `/dev/ttyAMA0` naît quand même `root:tty 600` (réclamé
+> comme console) → l'utilisateur `presence` ne peut pas l'ouvrir (`Permission denied`).
+> `install.sh` corrige ça (règle udev `99-ttyama0.rules` + `mask serial-getty@ttyAMA0`).
+> Si tu n'as pas (re)lancé install.sh, applique à la main :
+> ```bash
+> echo 'KERNEL=="ttyAMA0", GROUP="dialout", MODE="0660"' | sudo tee /etc/udev/rules.d/99-ttyama0.rules
+> sudo systemctl mask serial-getty@ttyAMA0.service
+> sudo udevadm control --reload-rules
+> sudo udevadm trigger --action=add --subsystem-match=tty --sysname-match=ttyAMA0
+> ls -l /dev/ttyAMA0   # doit être crw-rw---- root dialout
+> ```
+
 ### 3.3 Redémarrer
 ```bash
 sudo reboot
@@ -295,6 +307,6 @@ Fixer le boîtier, orienter le LD2450 vers la zone, le module IR en ligne direct
 | TV ne réagit pas à l'IR | Mauvais code/ordre bits (`--lsb`), distance/angle, capturer la télécommande |
 | Bascule HDMI2 parasite | `timeout_s` trop court, ou zone trop restrictive |
 | Service ne démarre pas | `journalctl -u presence-tv` ; droits groupe `dialout`/`video` |
-| Permission denied UART/lirc | utilisateur `presence` pas dans `dialout`/`video` (relancer install.sh) |
+| Permission denied UART/lirc | `presence` pas dans `dialout`/`video`, OU ttyAMA0 en `root:tty 600` → règle udev + mask getty (cf. 3.2) |
 | Service redémarre en boucle (~30s) | watchdog : `READY=1` jamais envoyé (port KO au boot) ou boucle figée — voir `journalctl` |
 | WARNING "capteur muet" permanent | capteur débranché/mort, TX/RX inversés, ou baud — cf. Phase 6 |

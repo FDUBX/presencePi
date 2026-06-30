@@ -36,6 +36,17 @@ else
   echo "    config existante conservée : $DEST/presence_tv.ini"
 fi
 
+echo "==> Accès UART (ttyAMA0 en group dialout)"
+# ttyAMA0 naît parfois root:tty 600 (réclamé comme console) -> l'utilisateur
+# 'presence' (group dialout) ne peut pas l'ouvrir. Règle udev = group dialout
+# persistant au reboot ; mask getty = aucune console ne squatte le port.
+cat > /etc/udev/rules.d/99-ttyama0.rules <<'RULE'
+KERNEL=="ttyAMA0", GROUP="dialout", MODE="0660"
+RULE
+systemctl mask serial-getty@ttyAMA0.service
+udevadm control --reload-rules
+udevadm trigger --action=add --subsystem-match=tty --sysname-match=ttyAMA0 || true
+
 echo "==> Service systemd"
 install -m 644 "systemd/$SERVICE" "/etc/systemd/system/$SERVICE"
 systemctl daemon-reload
@@ -52,8 +63,10 @@ Installation terminée.
        python3 $DEST/samsung_ir_gen.py 0xE0E09768 | sudo tee $DEST/ir/hdmi1.txt
        python3 $DEST/samsung_ir_gen.py 0xE0E0D728 | sudo tee $DEST/ir/hdmi2.txt
      (valider avec caméra smartphone : ir-ctl -d /dev/lirc0 --send=$DEST/ir/hdmi1.txt)
-  3. Désactiver le login série : sudo raspi-config -> Interface -> Serial Port
-       Login shell : No / Serial hardware : Yes
+  3. Login série déjà neutralisé (serial-getty masqué + règle udev dialout).
+     Vérifier que le hardware UART est activé : raspi-config -> Interface -> Serial Port
+       Login shell : No / Serial hardware : Yes  (sinon /dev/ttyAMA0 absent)
   4. Démarrer : sudo systemctl start $SERVICE
      Logs     : journalctl -fu $SERVICE
+     Vérifier : ls -l /dev/ttyAMA0  -> crw-rw---- root dialout
 EOF
