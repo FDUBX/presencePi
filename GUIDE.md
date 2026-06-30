@@ -205,11 +205,44 @@ sudo ./tools/ir_onsite.sh --try-only    # juste l'essai séquentiel sur la TV
 - **Phase 3** : envoie tour à tour les codes candidats (HDMI1/2/3/4 MSB+LSB, Source toggle)
   et te demande à chaque fois si la TV a basculé → identifie le bon code sans régénérer.
 
-Une fois les codes gagnants connus, génère les fichiers définitifs :
+#### Générer les fichiers définitifs
+
+Le **nom du candidat gagnant** te dit tout : `_lsb` dans le nom → ajouter `--lsb` ;
+`_msb` → pas de flag. Le code hex = celui affiché par le script pour ce candidat.
+
+**Cas MSB** (`HDMI1_msb` / `HDMI2_msb` ont basculé la TV) — sans flag :
 ```bash
-python3 /opt/presence_tv/samsung_ir_gen.py <CODE_HDMI1> | sudo tee /opt/presence_tv/ir/hdmi1.txt
-python3 /opt/presence_tv/samsung_ir_gen.py <CODE_HDMI2> | sudo tee /opt/presence_tv/ir/hdmi2.txt
+python3 /opt/presence_tv/samsung_ir_gen.py 0xE0E09768 | sudo tee /opt/presence_tv/ir/hdmi1.txt
+python3 /opt/presence_tv/samsung_ir_gen.py 0xE0E0D728 | sudo tee /opt/presence_tv/ir/hdmi2.txt
+```
+
+**Cas LSB** (`HDMI1_lsb` / `HDMI2_lsb` ont gagné) — avec `--lsb` :
+```bash
+python3 /opt/presence_tv/samsung_ir_gen.py --lsb 0xE0E09768 | sudo tee /opt/presence_tv/ir/hdmi1.txt
+python3 /opt/presence_tv/samsung_ir_gen.py --lsb 0xE0E0D728 | sudo tee /opt/presence_tv/ir/hdmi2.txt
+```
+
+**Cas mixte** (ex: HDMI1 msb mais HDMI2 lsb) — flag par fichier :
+```bash
+python3 /opt/presence_tv/samsung_ir_gen.py 0xE0E09768 | sudo tee /opt/presence_tv/ir/hdmi1.txt
+python3 /opt/presence_tv/samsung_ir_gen.py --lsb 0xE0E0D728 | sudo tee /opt/presence_tv/ir/hdmi2.txt
+```
+
+Vérifier + appliquer :
+```bash
+wc -l /opt/presence_tv/ir/hdmi1.txt    # >60 lignes = OK (pas vide / pas que des #)
 sudo systemctl restart presence-tv
+journalctl -fu presence-tv             # 'Switch TV -> HDMI 1' SANS ligne 'IR erreur'
+```
+
+#### Pérenniser dans le repo
+
+Sinon au prochain flash SD tu retombes sur les placeholders. Depuis `~/presencePi` sur le Pi :
+```bash
+cp /opt/presence_tv/ir/hdmi1.txt /opt/presence_tv/ir/hdmi2.txt ir/
+git add ir/hdmi1.txt ir/hdmi2.txt
+git commit -m "feat: codes IR Samsung validés (HDMI1/HDMI2)"
+git push
 ```
 
 **Checklist on-site (gestes) :**
