@@ -192,6 +192,34 @@ Pointer le module vers la caméra → la LED doit clignoter **violet/blanc**.
 
 ✅ Les deux fichiers IR font effectivement basculer la TV.
 
+### 7.4 Test "clé en main" sur place — `tools/ir_onsite.sh`
+
+Quand la validation IR ne peut se faire **que devant la TV**, ce script enchaîne tout :
+```bash
+sudo ./tools/ir_onsite.sh          # diagnostic + boucle caméra + essai des codes
+sudo ./tools/ir_onsite.sh --loop-only   # juste la boucle caméra (test émission)
+sudo ./tools/ir_onsite.sh --try-only    # juste l'essai séquentiel sur la TV
+```
+- **Phase 1** : vérifie que `lirc0` supporte SEND + overlay chargé.
+- **Phase 2** : envoie HDMI1 en boucle 20 s → tu filmes la LED (voir checklist).
+- **Phase 3** : envoie tour à tour les codes candidats (HDMI1/2/3/4 MSB+LSB, Source toggle)
+  et te demande à chaque fois si la TV a basculé → identifie le bon code sans régénérer.
+
+Une fois les codes gagnants connus, génère les fichiers définitifs :
+```bash
+python3 /opt/presence_tv/samsung_ir_gen.py <CODE_HDMI1> | sudo tee /opt/presence_tv/ir/hdmi1.txt
+python3 /opt/presence_tv/samsung_ir_gen.py <CODE_HDMI2> | sudo tee /opt/presence_tv/ir/hdmi2.txt
+sudo systemctl restart presence-tv
+```
+
+**Checklist on-site (gestes) :**
+- [ ] Caméra **SELFIE** (la frontale ; l'arrière filtre souvent l'IR → flash invisible).
+- [ ] LED émettrice à ~2 cm de l'objectif → flash **violet/blanc** = émission OK.
+- [ ] Pour l'essai TV : module en **ligne directe** vers le récepteur IR de la TV, 1–2 m.
+- [ ] TV pré-réglée sur une entrée **connue** (ex: HDMI2) pour voir la bascule.
+- [ ] Si aucun code candidat ne marche → capturer depuis la télécommande **BN59-01259B**
+      (récepteur IR sur GPIO18 requis, cf. 7.3 §2).
+
 ---
 
 ## Phase 8 — Réglages (zone & timeout) 🍓
