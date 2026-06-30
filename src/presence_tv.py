@@ -12,6 +12,7 @@ import configparser
 import logging
 import os
 import signal
+import socket
 import struct
 import subprocess
 import sys
@@ -23,6 +24,21 @@ CONFIG_PATH = os.environ.get(
     "PRESENCE_TV_CONFIG",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "presence_tv.ini"),
 )
+
+
+def sd_notify(message):
+    """Envoie un message au watchdog systemd. No-op hors systemd (NOTIFY_SOCKET absent)."""
+    addr = os.environ.get("NOTIFY_SOCKET")
+    if not addr:
+        return
+    if addr.startswith("@"):  # namespace abstrait
+        addr = "\0" + addr[1:]
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            sock.connect(addr)
+            sock.sendall(message.encode())
+    except OSError as exc:
+        logging.debug("sd_notify échec : %s", exc)
 
 
 def load_config(path):
@@ -175,6 +191,8 @@ def main():
     baud = cfg.getint("serial", "baud")
     timeout_s = cfg.getfloat("presence", "timeout_s")
     poll_s = cfg.getfloat("presence", "poll_s", fallback=0.033)
+    heartbeat_s = cfg.getfloat("monitor", "heartbeat_s", fallback=60.0)
+    uart_silence_s = cfg.getfloat("monitor", "uart_silence_s", fallback=5.0)
 
     zone = build_zone(cfg)
 
@@ -193,29 +211,63 @@ def main():
     sensor = LD2450(port, baud)
     logging.info("Démarrage détecteur présence — port=%s baud=%d", port, baud)
 
+    # Watchdog systemd : ping à la moitié de l'intervalle imposé (WATCHDOG_USEC).
+    wd_usec = os.environ.get("WATCHDOG_USEC")
+    wd_interval = (int(wd_usec) / 1e6) / 2 if wd_usec else None
+    sd_notify("READY=1")
+
     current_input = None
-    last_presence = time.monotonic()
+    now = time.monotonic()
+    last_presence = now
+    last_frame = now
+    last_heartbeat = now
+    last_watchdog = now
+    silence_logged = False
 
     try:
         while runner.running:
-            targets = sensor.read_frame()
-            if targets is None:
-                time.sleep(0.005)
-                continue
-
-            present = any(in_zone(t, zone) for t in targets)
             now = time.monotonic()
+            targets = sensor.read_frame()
 
-            if present:
-                last_presence = now
-                if current_input != 1:
-                    ir.switch_input(1)
-                    current_input = 1
-            elif current_input != 2 and (now - last_presence) > timeout_s:
-                ir.switch_input(2)
-                current_input = 2
+            if targets is not None:
+                last_frame = now
+                if silence_logged:
+                    logging.info("LD2450 — trames de nouveau reçues.")
+                    silence_logged = False
 
-            time.sleep(poll_s)
+                present = any(in_zone(t, zone) for t in targets)
+                if present:
+                    last_presence = now
+                    if current_input != 1:
+                        ir.switch_input(1)
+                        current_input = 1
+                elif current_input != 2 and (now - last_presence) > timeout_s:
+                    ir.switch_input(2)
+                    current_input = 2
+
+            # Silence UART : capteur muet / débranché
+            if not silence_logged and (now - last_frame) > uart_silence_s:
+                logging.warning(
+                    "Aucune trame LD2450 depuis %.0fs — capteur muet ?", now - last_frame
+                )
+                silence_logged = True
+
+            # Heartbeat : preuve de vie + état courant
+            if (now - last_heartbeat) >= heartbeat_s:
+                logging.info(
+                    "alive — input=%s présence=%s silence=%.1fs",
+                    current_input,
+                    (now - last_presence) <= timeout_s,
+                    now - last_frame,
+                )
+                last_heartbeat = now
+
+            # Watchdog systemd : ping pour prouver que la boucle n'est pas figée
+            if wd_interval and (now - last_watchdog) >= wd_interval:
+                sd_notify("WATCHDOG=1")
+                last_watchdog = now
+
+            time.sleep(poll_s if targets is not None else 0.005)
     finally:
         sensor.close()
         logging.info("Capteur fermé. Sortie.")

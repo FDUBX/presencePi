@@ -3,12 +3,14 @@ Description=Presence TV Input Controller - Samsung UE55MU6170
 After=multi-user.target
 
 [Service]
-Type=simple
+Type=notify
 ExecStart=/usr/bin/python3 /opt/presence_tv/presence_tv.py
 Environment=PRESENCE_TV_CONFIG=/opt/presence_tv/presence_tv.ini
 WorkingDirectory=/opt/presence_tv
 Restart=always
 RestartSec=5
+# Tue + relance si la boucle fige (sd_notify WATCHDOG=1 attendu < 30s)
+WatchdogSec=30
 User=presence
 # Accès UART + lirc
 SupplementaryGroups=dialout video
