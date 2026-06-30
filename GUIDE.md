@@ -112,6 +112,7 @@ ir-ctl -d /dev/lirc0 --features    # liste les capacités TX
 1. Récupérer le repo sur le Pi (git clone, ou `scp -r` depuis le PC).
 2. Depuis la racine du repo :
    ```bash
+   chmod +x install.sh
    sudo ./install.sh
    ```
    Installe deps (`python3-serial`, `v4l-utils`...), crée l'utilisateur `presence`,
@@ -166,9 +167,8 @@ python3 tools/ld2450_monitor.py --port /dev/ttyAMA0 --baud 256000
 
 ### 7.1 Générer les trames
 ```bash
-cd /opt/presence_tv
-python3 samsung_ir_gen.py 0xE0E09768 | sudo tee ir/hdmi1.txt   # HDMI1
-python3 samsung_ir_gen.py 0xE0E0D728 | sudo tee ir/hdmi2.txt   # HDMI2 (à confirmer)
+python3 /opt/presence_tv/samsung_ir_gen.py 0xE0E09768 | sudo tee /opt/presence_tv/ir/hdmi1.txt   # HDMI1
+python3 /opt/presence_tv/samsung_ir_gen.py 0xE0E0D728 | sudo tee /opt/presence_tv/ir/hdmi2.txt   # HDMI2
 ```
 
 ### 7.2 Vérifier l'émission (caméra smartphone)
@@ -259,6 +259,9 @@ git push
 
 Avec `tools/ld2450_monitor.py`, relever les `x`/`y` aux limites de la zone utile
 (canapé / position d'usage). Éditer `/opt/presence_tv/presence_tv.ini` :
+```bash
+sudo nano /opt/presence_tv/presence_tv.ini
+```
 ```ini
 [presence]
 timeout_s = 30          # délai d'absence avant HDMI2
@@ -371,3 +374,4 @@ Fixer le boîtier, orienter le LD2450 vers la zone, le module IR en ligne direct
 | Permission denied UART/lirc | `presence` pas dans `dialout`/`video`, OU ttyAMA0 en `root:tty 600` → règle udev + mask getty (cf. 3.2) |
 | Service redémarre en boucle (~30s) | watchdog : `READY=1` jamais envoyé (port KO au boot) ou boucle figée — voir `journalctl` |
 | WARNING "capteur muet" permanent | capteur débranché/mort, TX/RX inversés, ou baud — cf. Phase 6 |
+| Appliquer un changement (config / fichiers IR) | `sudo systemctl restart presence-tv` |
