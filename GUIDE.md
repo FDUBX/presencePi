@@ -219,6 +219,33 @@ Scénarios à valider (observer les logs `Switch TV -> HDMI x`) :
 
 ✅ Les 4 scénarios passent, TV pilotée correctement.
 
+### 9.1 Monitoring (heartbeat / silence / watchdog)
+
+Le service émet désormais des logs de santé en plus des switchs :
+- **Heartbeat** toutes `heartbeat_s` (défaut 60s) :
+  `alive — input=1 présence=True silence=0.1s` → preuve de vie + état courant.
+- **Silence UART** : si aucune trame LD2450 reçue depuis `uart_silence_s` (défaut 5s) →
+  `WARNING: Aucune trame LD2450 depuis Ns — capteur muet ?` (capteur débranché/mort).
+  Au retour des trames : `LD2450 — trames de nouveau reçues.`
+- **Watchdog systemd** (`WatchdogSec=30` + `Type=notify`) : si la boucle fige >30s,
+  systemd tue et relance le service (le `Restart=always` ne couvrait que les crashs, pas les freezes).
+
+Réglages dans `presence_tv.ini`, section `[monitor]` :
+```ini
+[monitor]
+heartbeat_s = 60
+uart_silence_s = 5
+```
+
+Tests rapides :
+```bash
+journalctl -fu presence-tv                 # voir "alive" toutes les 60s
+# débrancher le capteur → WARNING "capteur muet" doit apparaître < 5s, rebrancher → "de nouveau reçues"
+systemctl status presence-tv               # rester "active (running)" > 1 min = watchdog OK (pas de timeout notify)
+```
+
+✅ Heartbeat visible, silence détecté, service stable >1 min (watchdog pinge bien).
+
 ---
 
 ## Phase 10 — Mise en production 🍓
@@ -269,3 +296,5 @@ Fixer le boîtier, orienter le LD2450 vers la zone, le module IR en ligne direct
 | Bascule HDMI2 parasite | `timeout_s` trop court, ou zone trop restrictive |
 | Service ne démarre pas | `journalctl -u presence-tv` ; droits groupe `dialout`/`video` |
 | Permission denied UART/lirc | utilisateur `presence` pas dans `dialout`/`video` (relancer install.sh) |
+| Service redémarre en boucle (~30s) | watchdog : `READY=1` jamais envoyé (port KO au boot) ou boucle figée — voir `journalctl` |
+| WARNING "capteur muet" permanent | capteur débranché/mort, TX/RX inversés, ou baud — cf. Phase 6 |
